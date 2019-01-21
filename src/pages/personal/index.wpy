@@ -1,0 +1,109 @@
+<style lang="scss">
+@import '../../styles/variables';
+button {
+  &:active,
+  &:focus,
+  &:hover {
+    background-color: transparent;
+  }
+}
+.personal-head {
+  width: 100%;
+  padding: 60rpx 0 32rpx;
+  margin-top: 16rpx;
+  background-color: #ffffff;
+  border-top: 2rpx solid $border-grey;
+
+  .portrait {
+    width: 128rpx;
+    height: 128rpx;
+    margin-bottom: 24rpx;
+    border-radius: 50%;
+    background-color: #d8d8d8;
+  }
+  .no-image {
+    background-color: #d3d3d3;
+  }
+  .text {
+    font-size: 30rpx;
+    color: rgba(0, 20, 41, 0.7);
+  }
+  .button {
+    color: $base-blue;
+  }
+  .phone {
+    margin-top: 6rpx;
+    color: #7f8994;
+  }
+  .button-white-with-border {
+    height: 64rpx;
+    line-height: 64rpx;
+    padding: 0 48rpx;
+    margin: 24rpx 0 4rpx;
+  }
+}
+</style>
+<template>
+  <view class="container">
+    <view class="flex-col-center personal-head">
+      <block wx:if="{{globalData.isLogin}}">
+        <image class="portrait" src="{{memberInfo.headImgUrl}}"></image>
+        <view class="text">{{memberInfo.nickname}}</view>
+        <view wx:if="{{memberInfo.phone && memberInfo.phone.number}}" class="phone flex-row-center">
+          <view>{{memberInfo.phone.number}}</view>
+        </view>
+      <button wx:else class="text-m button-white-with-border" open-type="getPhoneNumber" @getphonenumber="getPhoneNumber">获取电话号码</button>
+      </block>
+      <block wx:else>
+        <image class="portrait no-image"></image>
+        <button class="text button" open-type="getUserInfo" @getuserinfo="getUserInfo">点击登录</button>
+      </block>
+    </view>
+  </view>
+</template>
+
+<script>
+import wepy from 'wepy';
+import { connect } from 'wepy-redux';
+
+@connect(
+  {
+    globalData: state => {
+      return state.globalStore.globalData;
+    },
+    memberInfo: state => {
+      return state.globalStore.memberInfo;
+    }
+  },
+  {}
+)
+export default class Personal extends wepy.page {
+  config = {
+    navigationBarTitleText: '我的'
+  };
+  components = {};
+
+  mixins = [];
+
+  data = {};
+
+  computed = {};
+
+  methods = {
+    async getUserInfo(e) {
+      if (e.detail.errMsg.indexOf('getUserInfo:fail') < 0) {
+        await this.$parent.login(e.detail);
+      }
+    },
+    getPhoneNumber(e) {
+      if (e.detail.errMsg.indexOf('getPhoneNumber:fail') < 0) {
+        this.$parent.updatePhoneNumber(e.detail);
+      }
+    }
+  };
+
+  events = {};
+
+  onLoad() {}
+}
+</script>

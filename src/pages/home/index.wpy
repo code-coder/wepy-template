@@ -1,0 +1,87 @@
+<style lang="scss">
+@import '../../styles/variables';
+.container {
+  width: 100%;
+}
+</style>
+<template>
+  <view wx:if="{{dataLoaded}}" class="container">加载完成</view>
+  <PageLoading wx:else></PageLoading>
+</template>
+
+<script>
+import wepy from 'wepy';
+import { connect } from 'wepy-redux';
+import PageLoading from '../../components/common/page-loading';
+import { minAppSettingsStart } from '../../store/actions/global/min-app-settings';
+import { updateGlobalData } from '../../store/actions/global/global-data';
+
+@connect(
+  {
+    globalData: state => {
+      return state.globalStore.globalData;
+    },
+    loginStatus: state => {
+      return state.globalStore.globalData.loginStatus;
+    },
+    settings: state => {
+      return state.globalStore.settings;
+    }
+  },
+  {
+    minAppSettingsStart,
+    updateGlobalData
+  }
+)
+export default class Home extends wepy.page {
+  config = {
+    navigationBarTitleText: '首页'
+  };
+
+  components = { PageLoading };
+
+  data = { dataLoaded: false };
+  watch = {
+    loginStatus() {
+      if (this.globalData.isLogin) {
+        if (this.globalData.remark) {
+          console.log('使用中登录');
+        } else {
+          console.log('异步登录');
+        }
+      } else {
+        console.log('未登录');
+      }
+    }
+  };
+  methods = {};
+
+  events = {};
+
+  onLoad() {
+    this.methods.minAppSettingsStart({});
+    if (this.globalData.loginStatus) {
+      if (this.globalData.isLogin) {
+        console.log('同步登录');
+      } else {
+        console.log('未登录');
+      }
+    } else {
+      console.log('登录中...');
+    }
+    setTimeout(() => {
+      this.dataLoaded = true;
+      this.$apply();
+    }, 1000);
+  }
+
+  onShareAppMessage() {
+    const homePageShareParams = JSON.parse(this.settings.homePageShareParams);
+    return {
+      title: homePageShareParams.title || '默认',
+      path: homePageShareParams.path || '/pages/home/index',
+      imageUrl: homePageShareParams.imageUrl || '无照片'
+    };
+  }
+}
+</script>

@@ -1,0 +1,24 @@
+<style lang="scss">
+.loading-container {
+  width: 100%;
+  text-align: center;
+  font-size: 28rpx;
+}
+</style>
+<template>
+  <view class="loading-container">
+    页面加载中...
+  </view>
+</template>
+<script>
+import wepy from 'wepy';
+
+export default class extends wepy.component {
+  data = {};
+
+  watch = {};
+  methods = {};
+  events = {};
+  onLoad() {}
+}
+</script>

@@ -1,0 +1,254 @@
+<style lang="scss">
+@import './styles/base.scss';
+</style>
+
+<script>
+import wepy from 'wepy';
+import 'wepy-async-function';
+
+import { setStore, connect } from 'wepy-redux';
+import configStore from './store';
+import { updateGlobalData } from './store/actions/global/global-data';
+import { getMemberInfoSuccess, updateMemberInfo } from './store/actions/global/member-info';
+import { appLogin, getAndUpdateMemberInfoApi } from './api/api';
+
+const store = configStore();
+setStore(store);
+
+@connect(
+  {},
+  {
+    updateGlobalData,
+    getMemberInfoSuccess,
+    updateMemberInfo
+  }
+)
+export default class extends wepy.app {
+  config = {
+    pages: ['pages/home/index', 'pages/personal/index'],
+    window: {
+      navigationBarBackgroundColor: '#fff',
+      navigationBarTitleText: 'wepy template',
+      navigationBarTextStyle: 'black'
+    },
+    tabBar: {
+      color: '#7F8994',
+      selectedColor: '#108ee9',
+      backgroundColor: '#fff',
+      borderStyle: 'black',
+      list: [
+        {
+          pagePath: 'pages/home/index',
+          text: '首页',
+          iconPath: 'images/tabs/home.png',
+          selectedIconPath: 'images/tabs/home_active.png'
+        },
+        {
+          pagePath: 'pages/personal/index',
+          text: '我的',
+          iconPath: 'images/tabs/personal.png',
+          selectedIconPath: 'images/tabs/personal_active.png'
+        }
+      ]
+    },
+    networkTimeout: {
+      request: 10000,
+      downloadFile: 10000
+    }
+  };
+
+  globalData = {
+    cookie: null
+  };
+
+  constructor() {
+    super();
+    this.requestNum = 0;
+    this.loadingTimer = null;
+    this.showLoading = false;
+    this.logining = false;
+    this.use('requestfix');
+    this.use('promisify');
+    this.intercept('request', {
+      config(params) {
+        params.header = { cookie: this.globalData.cookie };
+
+        //集中loading一段时间内收到的requests，在发出请求1s后再显示loading
+        if (this.requestNum === 0) {
+          this.loadingTimer = setTimeout(() => {
+            wepy.showLoading({ title: '加载中...' });
+            this.showLoading = true;
+            clearTimeout(this.loadingTimer);
+            this.loadingTimer = null;
+          }, 1000);
+        }
+        this.requestNum += 1;
+        return params;
+      },
+      success(res) {
+        const {
+          data: { data, success, errmessage },
+          header,
+          statusCode
+        } = res;
+        if (statusCode === 404) {
+          wx.showToast({ icon: 'none', title: '接口地址错误' });
+        } else if (statusCode === 500) {
+          wx.showToast({ icon: 'none', title: '服务器内部错误' });
+        } else if (statusCode === 401 || statusCode === 422) {
+          wx.showToast({ icon: 'none', title: '验证失败' });
+          wepy.clearStorage();
+          this.globalData.cookie = null;
+          // 重新尝试登录
+          wx.getSetting({
+            success: res => {
+              if (res.authSetting['scope.userInfo']) {
+                !this.logining && this.login();
+              } else {
+                this.methods.updateGlobalData({ loginStatus: 'unlogin' });
+              }
+            }
+          });
+        } else if (success) {
+          if (this.logining) {
+            if (header['set-cookie']) {
+              this.globalData.cookie = header['set-cookie'].substring(header['set-cookie'].indexOf('EGG_SESS'));
+            } else {
+              this.globalData.cookie = header['Set-Cookie'].substring(header['Set-Cookie'].indexOf('EGG_SESS'));
+            }
+            wepy.setStorageSync('WEPY_TEMPLATE_LOGIN_COOKIE', this.globalData.cookie);
+            return success;
+          } else {
+            return data || success;
+          }
+        } else {
+          wx.showModal({
+            title: '提示',
+            showCancel: false,
+            content: errmessage || '请求失败'
+          });
+        }
+      },
+      fail(res) {
+        // 登录过期时处理
+        if (res.errMsg.indexOf('request:timeout') > -1) {
+          wx.showToast({ icon: 'none', title: '请求超时' });
+        }
+      },
+      complete() {
+        if (this.requestNum) {
+          this.requestNum -= 1; // 释放收集到的request数量
+        }
+        if (this.requestNum === 0) {
+          if (this.loadingTimer) {
+            clearTimeout(this.loadingTimer);
+            this.loadingTimer = null;
+          }
+          if (this.showLoading) {
+            this.showLoading = false;
+            wepy.hideLoading(); // 当一段时间内收集到的requests集中处理完毕，隐藏loading
+          }
+        }
+      }
+    });
+  }
+  /* 针对后台使用cookie验证的情况 */
+  /* 1、先获取缓存cookie，如果没有就查看是否有授权，有授权直接拿用户信息登录，未授权就是未登录的状态 */
+  /* 2、用户主动登录，把cookie存入storage */
+  /* 3、cookie过期，如果没有就查看是否有授权，有授权直接拿用户信息登录，未授权提示用户已过期 */
+  async onLaunch() {
+    this.checkForUpdate();
+    // 获取设备信息
+    wx.getSystemInfo({
+      success: res => {
+        const { platform, model, windowHeight, screenWidth } = res;
+        this.methods.updateGlobalData({ platform, model, windowHeight, screenWidth, ratio: screenWidth / 375 });
+      }
+    });
+    try {
+      const cookie = wepy.getStorageSync('WEPY_TEMPLATE_LOGIN_COOKIE');
+      const wxSetting = await wepy.getSetting();
+      const userInfoAuthorized = wxSetting.authSetting['scope.userInfo'];
+      let loginStatus = 'unlogin';
+      if (cookie) {
+        this.globalData.cookie = cookie;
+        loginStatus = 'login';
+        await this.getMemberInfoSync();
+      } else if (userInfoAuthorized) {
+        await this.login(false);
+        loginStatus = 'login';
+      }
+      this.methods.updateGlobalData({ loginStatus, appLaunched: true });
+    } catch (e) {
+      this.methods.updateGlobalData({ loginStatus: 'unlogin', appLaunched: true });
+    }
+  }
+
+  /**
+   * 登录主函数
+   * @param {Boolean} needUpdateGlobal 是否需要更新全局状态
+   */
+  async login(needUpdateGlobal = true) {
+    this.logining = true;
+    try {
+      const { code } = await wepy.login();
+      const loginData = await wepy.getUserInfo();
+      const data = await appLogin({
+        method: 'POST',
+        data: { code, loginData }
+      });
+      if (data) {
+        this.logining = false;
+        await this.getMemberInfoSync();
+        if (needUpdateGlobal) {
+          this.methods.updateGlobalData({ loginStatus: 'login', remark: 'procedural' });
+          wx.showToast({ title: '已登录', icon: 'success' });
+        }
+      } else {
+        throw new Error('登录发生异常！');
+      }
+    } catch (e) {
+      console.log(e);
+      this.logining = false;
+    }
+  }
+
+  // 获取用户信息
+  async getMemberInfoSync() {
+    const data = await getAndUpdateMemberInfoApi({
+      method: 'GET',
+      data: { extends: ['wechatMPFocus'] }
+    });
+    if (data) {
+      this.methods.getMemberInfoSuccess(data);
+    } else {
+      throw new Error('获取用户信息失败！');
+    }
+    return data;
+  }
+
+  // 获取手机号
+  updatePhoneNumber(wechatMinAppPhone) {
+    this.methods.updateMemberInfo({ method: 'PUT', params: { wechatMinAppPhone } });
+  }
+
+  // 检测是否有更新
+  checkForUpdate() {
+    if (wx.canIUse('getUpdateManager')) {
+      const updateManager = wx.getUpdateManager();
+      updateManager.onCheckForUpdate(({ hasUpdate }) => {
+        if (hasUpdate) {
+          wx.showModal({
+            title: '提示',
+            showCancel: false,
+            content: '当前小程序不是最新版，更新后将重启应用'
+          });
+          updateManager.onUpdateReady(() => {
+            updateManager.applyUpdate();
+          });
+        }
+      });
+    }
+  }
+}
+</script>

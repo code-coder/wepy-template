@@ -1,0 +1,13 @@
+{
+  "description": "a wepy template",
+  "setting": {
+    "urlCheck": true,
+    "es6": false,
+    "postcss": false,
+    "minified": false
+  },
+  "compileType": "miniprogram",
+  "appid": "wxb67f9f8289bf9ed5",
+  "projectname": "wepy-template",
+  "miniprogramRoot": "./dist"
+}
