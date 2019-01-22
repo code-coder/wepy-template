@@ -12,9 +12,33 @@
   - redux-saga
   - scss
 
-## Rules
+## 快速开始
 
-
+- environment
+
+```
+npm i wepy-cli -g
+```
+
+`cd`到项目目录
+
+```
+npm i
+```
+
+- dev
+
+```shell
+npm run start
+```
+
+- prod
+
+```
+npm run build
+```
+
+## Rules
 
 ### 文件规范
 
@@ -25,7 +49,7 @@
 - 命名尽量语义化，提高代码自解释性，所有命名不得以\$开头
 - 网络数据统一根据使用情况放入 redux，如果只是纯展示性（不需要维护数据状态）就不放入 redux
 - 如果没有复杂的 api 调用逻辑，就不使用 redux-saga
-- 尽量采用 ES6+语法，涉及异步时尽量`promise`/`async func`
+- 尽量采用 ES6+语法，涉及异步时尽量`promise`/`async func`
 - 最小化变量作用域，声明关键词优先级 `const`>`let`>`var`
 
 ### SCSS Rules
@@ -49,7 +73,7 @@
 
 ### Template Rules
 
-- 所有依赖组件必须以在`components={}`中注册的 id 进行引用，遵循首字母大写的驼峰命名。
+- 所有依赖组件必须以在`components={}`中注册的 id 进行引用，遵循首字母大写的驼峰命名。
 - 事件绑定采用优化后的语法@tap="handler"，etc.
 
 ### Tips
